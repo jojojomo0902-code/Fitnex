@@ -51,14 +51,23 @@ async function startServer() {
         return initialData;
       }
       const data = JSON.parse(fileContent);
-      // Ensure essential fields exist, if not merge with initial
-      if (!data.classes || data.classes.length === 0 || !data.inventory || data.inventory.length === 0) {
-        console.log("DB missing core collections, merging with initial...");
-        const merged = { ...initialData, ...data };
-        // If they are actually empty arrays (not missing), we still might want to merge if it's a fresh deploy
-        if (!data.classes || data.classes.length === 0) merged.classes = initialData.classes;
-        if (!data.inventory || data.inventory.length === 0) merged.inventory = initialData.inventory;
-        return merged;
+      // Ensure ALL essential collections exist
+      let updated = false;
+      const keys: (keyof typeof initialData)[] = ["users", "classes", "inventory", "bookings", "attendance"];
+      keys.forEach(key => {
+        if (!data[key]) {
+          data[key] = initialData[key];
+          updated = true;
+        } else if (Array.isArray(data[key]) && data[key].length === 0 && (key === "classes" || key === "inventory")) {
+          // If empty arrays for essential data, restore them
+          data[key] = initialData[key];
+          updated = true;
+        }
+      });
+
+      if (updated) {
+        console.log("DB was incomplete, updated missing fields.");
+        saveDb(data);
       }
       return data;
     } catch (e) {

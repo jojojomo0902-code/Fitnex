@@ -127,6 +127,8 @@ export default function App() {
   const [selectedRole, setSelectedRole] = useState<UserRole>("Member");
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState("home");
+  const [isBackendAvailable, setIsBackendAvailable] = useState(true);
+  const [notifications, setNotifications] = useState<{id: string, message: string, type: 'success' | 'error'}[]>([]);
   
   // Data State
   const [classes, setClasses] = useState<GymClass[]>([
@@ -144,28 +146,52 @@ export default function App() {
   ]);
   const [adminStats, setAdminStats] = useState<any>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [myBookings, setMyBookings] = useState<string[]>([]);
+
+  const addNotification = (message: string, type: 'success' | 'error' = 'success') => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setNotifications(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 4000);
+  };
 
   const fetchData = async () => {
     try {
-      const classRes = await fetch("/api/classes");
-      if (classRes.ok) {
+      // Check for local storage data first (Offline support)
+      const localClasses = localStorage.getItem('fitnex_classes');
+      const localInv = localStorage.getItem('fitnex_inventory');
+      const localBookings = localStorage.getItem('fitnex_my_bookings');
+      
+      if (localClasses) setClasses(JSON.parse(localClasses));
+      if (localInv) setInventory(JSON.parse(localInv));
+      if (localBookings) setMyBookings(JSON.parse(localBookings));
+
+      console.log("Fetching data from API...");
+      const classRes = await fetch("/api/classes").catch(() => null);
+      if (classRes && classRes.ok) {
         const data = await classRes.json();
         if (data && Array.isArray(data) && data.length > 0) {
           setClasses(data);
+          localStorage.setItem('fitnex_classes', JSON.stringify(data));
         }
+        setIsBackendAvailable(true);
+      } else {
+        setIsBackendAvailable(false);
       }
       
-      const invRes = await fetch("/api/inventory");
-      if (invRes.ok) {
+      const invRes = await fetch("/api/inventory").catch(() => null);
+      if (invRes && invRes.ok) {
         const data = await invRes.json();
         if (data && Array.isArray(data) && data.length > 0) {
           setInventory(data);
+          localStorage.setItem('fitnex_inventory', JSON.stringify(data));
         }
       }
 
       if (user?.role === "Admin" || user?.role === "Trainer") {
-        const statRes = await fetch("/api/admin/stats");
-        if (statRes.ok) {
+        const statRes = await fetch("/api/admin/stats").catch(() => null);
+        if (statRes && statRes.ok) {
           const stats = await statRes.json();
           setAdminStats(stats);
         }
@@ -181,6 +207,7 @@ export default function App() {
       }
     } catch (e) {
       console.error("Fetch Error:", e);
+      setIsBackendAvailable(false);
     }
   };
 
@@ -205,6 +232,7 @@ export default function App() {
     
     setUser(mockUser);
     setView("main");
+    addNotification(`Welcome back, ${mockUser.name}!`);
   };
 
   const handleRegister = (e: any) => {
@@ -224,25 +252,45 @@ export default function App() {
 
     setUser(mockUser);
     setView("main");
+    addNotification("Registration successful! Welcome to FitNex.");
   };
 
   const handleBook = async (classId: string) => {
+    if (myBookings.includes(classId)) {
+      addNotification("You already booked this class!", "error");
+      return;
+    }
+
     try {
       const res = await fetch("/api/classes/book", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user?.id, classId })
-      });
-      if (res.ok) {
-        alert("Booking successful! Expect to see you there.");
+      }).catch(() => null);
+
+      if (res && res.ok) {
+        addNotification("Booking successful!");
         fetchData();
+        const updatedBookings = [...myBookings, classId];
+        setMyBookings(updatedBookings);
+        localStorage.setItem('fitnex_my_bookings', JSON.stringify(updatedBookings));
       } else {
-        const error = await res.json();
-        alert(error.error || "Booking failed");
+        // Fallback for static deployment
+        const updatedClasses = classes.map(c => 
+          c.id === classId ? { ...c, booked: c.booked + 1 } : c
+        );
+        setClasses(updatedClasses);
+        localStorage.setItem('fitnex_classes', JSON.stringify(updatedClasses));
+        
+        const updatedBookings = [...myBookings, classId];
+        setMyBookings(updatedBookings);
+        localStorage.setItem('fitnex_my_bookings', JSON.stringify(updatedBookings));
+        
+        addNotification("Booking saved! (Offline Mode)");
       }
     } catch (e) {
       console.error(e);
-      alert("An error occurred during booking");
+      addNotification("Error connecting to server.", "error");
     }
   };
 
@@ -252,17 +300,23 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user?.id, productId })
-      });
-      if (res.ok) {
-        alert("Purchase successful! Item added to your orders.");
+      }).catch(() => null);
+
+      if (res && res.ok) {
+        addNotification("Purchase successful!");
         fetchData();
       } else {
-        const error = await res.json();
-        alert(error.error || "Purchase failed");
+        // Fallback for static deployment
+        const updatedInventory = inventory.map(item => 
+          item.id === productId ? { ...item, stock: item.stock - 1 } : item
+        );
+        setInventory(updatedInventory);
+        localStorage.setItem('fitnex_inventory', JSON.stringify(updatedInventory));
+        addNotification("Purchase complete! (Offline Mode)");
       }
     } catch (e) {
       console.error(e);
-      alert("An error occurred during purchase");
+      addNotification("Error processing purchase.", "error");
     }
   };
 
@@ -471,6 +525,29 @@ export default function App() {
         <div className="space-y-6">
           {activeTab === "home" && (
             <>
+              {myBookings.length > 0 && (
+                <Card className="mb-6 bg-accent/5 border-accent/10">
+                   <div className="flex items-center justify-between mb-4">
+                     <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                       <History className="w-4 h-4 text-accent" />
+                       Your Booked Classes
+                     </h4>
+                     <span className="text-[10px] font-bold px-2 py-0.5 bg-accent/10 text-accent rounded-full">{myBookings.length}</span>
+                   </div>
+                   <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none">
+                      {myBookings.map(id => {
+                        const c = classes.find(item => item.id === id);
+                        if (!c) return null;
+                        return (
+                          <div key={id} className="min-w-[140px] p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
+                             <p className="text-[8px] font-black text-accent uppercase mb-1">{c.time}</p>
+                             <p className="text-xs font-bold text-slate-900 truncate">{c.name}</p>
+                          </div>
+                        );
+                      })}
+                   </div>
+                </Card>
+              )}
               <div className="flex flex-col md:flex-row gap-6">
                 <Card className="flex-1 bg-gradient-to-br from-primary via-primary to-accent text-white border-0 overflow-hidden relative shadow-[0_20px_40px_rgba(107,33,168,0.25)] group">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-white/20 transition-all duration-700" />
@@ -1198,8 +1275,10 @@ export default function App() {
           <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-10 pb-8 border-b border-slate-200">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">{user?.role} Active</p>
+                <span className={cn("w-2 h-2 rounded-full animate-pulse", isBackendAvailable ? "bg-green-500" : "bg-amber-500")} />
+                <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">
+                  {user?.role} {isBackendAvailable ? "Connected" : "Offline Mode"}
+                </p>
               </div>
               <h2 className="text-4xl font-extrabold text-slate-900 tracking-tighter">
                 {activeTab === "home" ? `Morning, ${user?.name.split(" ")[0]}!` : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
@@ -1218,7 +1297,9 @@ export default function App() {
               <div className="flex items-center gap-3">
                 <div className="text-right hidden sm:block">
                   <p className="text-sm font-black text-slate-900 leading-none">{user?.name}</p>
-                  <p className="text-[10px] text-primary font-black uppercase tracking-widest mt-1 opacity-70">Online</p>
+                  <p className={cn("text-[10px] font-black uppercase tracking-widest mt-1 opacity-70", isBackendAvailable ? "text-primary" : "text-amber-600")}>
+                    {isBackendAvailable ? "Online" : "Cloud Sync Off"}
+                  </p>
                 </div>
                 <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-primary font-bold shadow-sm group-hover:shadow-md transition-shadow">
                   {user?.name.charAt(0)}
@@ -1239,6 +1320,26 @@ export default function App() {
             </motion.div>
           </AnimatePresence>
         </main>
+
+        <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none">
+          <AnimatePresence>
+            {notifications.map(notif => (
+              <motion.div
+                key={notif.id}
+                initial={{ opacity: 0, x: 20, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: 20, scale: 0.95 }}
+                className={cn(
+                  "pointer-events-auto px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 border min-w-[200px]",
+                  notif.type === 'success' ? "bg-white border-green-100 text-green-800" : "bg-white border-red-100 text-red-800"
+                )}
+              >
+                <div className={cn("w-2 h-2 rounded-full", notif.type === 'success' ? "bg-green-500" : "bg-red-500")} />
+                <span className="text-sm font-bold">{notif.message}</span>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
       </div>
     );
   }
