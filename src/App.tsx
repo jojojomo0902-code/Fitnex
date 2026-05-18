@@ -16,7 +16,9 @@ import {
   AlertTriangle,
   QrCode,
   ShoppingCart,
-  Users
+  Users,
+  RefreshCw,
+  History
 } from "lucide-react";
 import { cn } from "./lib/utils";
 import type { User, UserRole, GymClass, Product } from "./types";
@@ -212,13 +214,8 @@ export default function App() {
   };
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('fitnex_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-      setView("main");
-    }
     fetchData();
-  }, [user?.id]); // Use ID to refresh if user changes session
+  }, [user]);
 
   const handleLogin = (e: any) => {
     e.preventDefault();
@@ -236,7 +233,6 @@ export default function App() {
     };
     
     setUser(mockUser);
-    localStorage.setItem('fitnex_user', JSON.stringify(mockUser));
     setView("main");
     addNotification(`Welcome back, ${mockUser.name}!`);
   };
@@ -257,7 +253,6 @@ export default function App() {
     };
 
     setUser(mockUser);
-    localStorage.setItem('fitnex_user', JSON.stringify(mockUser));
     setView("main");
     addNotification("Registration successful! Welcome to FitNex.");
   };
@@ -1276,21 +1271,28 @@ export default function App() {
           role={user?.role} 
           activeTab={activeTab} 
           setActiveTab={setActiveTab} 
-          onLogout={() => { 
-            setUser(null); 
-            setView("role"); 
-            localStorage.removeItem('fitnex_user');
-            localStorage.removeItem('fitnex_my_bookings');
-          }} 
+          onLogout={() => { setUser(null); setView("role"); }} 
         />
         <main className="flex-1 pb-24 md:pb-8 p-6 md:p-10 md:overflow-y-auto h-screen">
           <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-10 pb-8 border-b border-slate-200">
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="w-2 h-2 rounded-full animate-pulse bg-green-500" />
-                <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">
-                  {user?.role} Active
-                </p>
+              <div className="flex items-center gap-3 mb-1">
+                <div className={cn("flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider", isBackendAvailable ? "bg-green-50 text-green-600" : "bg-amber-50 text-amber-600")}>
+                  <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isBackendAvailable ? "bg-green-500" : "bg-amber-500")} />
+                  {isBackendAvailable ? "Connected" : "Offline Mode"}
+                </div>
+                {!isBackendAvailable && (
+                  <button 
+                    onClick={() => {
+                      fetchData();
+                      addNotification("Retrying connection...");
+                    }}
+                    className="p-1 hover:bg-slate-100 rounded-full transition-colors group"
+                    title="Retry Connection"
+                  >
+                    <RefreshCw className="w-3 h-3 text-slate-400 group-hover:text-primary group-hover:rotate-180 transition-all duration-500" />
+                  </button>
+                )}
               </div>
               <h2 className="text-4xl font-extrabold text-slate-900 tracking-tighter">
                 {activeTab === "home" ? `Morning, ${user?.name.split(" ")[0]}!` : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
@@ -1309,8 +1311,8 @@ export default function App() {
               <div className="flex items-center gap-3">
                 <div className="text-right hidden sm:block">
                   <p className="text-sm font-black text-slate-900 leading-none">{user?.name}</p>
-                  <p className="text-[10px] text-primary font-black uppercase tracking-widest mt-1 opacity-70">
-                    Online
+                  <p className={cn("text-[10px] font-black uppercase tracking-widest mt-1 opacity-70", isBackendAvailable ? "text-primary" : "text-amber-600")}>
+                    {isBackendAvailable ? "Online" : "Cloud Sync Off"}
                   </p>
                 </div>
                 <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-primary font-bold shadow-sm group-hover:shadow-md transition-shadow">
