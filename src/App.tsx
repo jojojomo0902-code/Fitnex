@@ -167,32 +167,53 @@ export default function App() {
 
   const handleLogin = async (e: any) => {
     e.preventDefault();
-    // Bypassing real login for quick exploration
-    const mockUser: User = {
-      id: "demo-" + selectedRole.toLowerCase(),
-      name: selectedRole === "Member" ? "Ali Abu" : selectedRole === "Trainer" ? "Siti Nur" : "Raja Admin",
-      email: "demo@fitnex.com",
-      role: selectedRole,
-      plan: selectedRole === "Member" ? "Premium" : undefined,
-      status: "Active"
-    };
-    setUser(mockUser);
-    setView("main");
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("email");
+    const password = formData.get("password");
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, role: selectedRole })
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        setUser(data.user);
+        setView("main");
+      } else {
+        alert(data.error || "Login failed");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("An error occurred during login");
+    }
   };
 
   const handleRegister = async (e: any) => {
     e.preventDefault();
-    // Bypassing real registration
-    const mockUser: User = {
-      id: "new-member",
-      name: "New Member",
-      email: "new@fitnex.com",
-      role: "Member",
-      plan: "Basic",
-      status: "Active"
-    };
-    setUser(mockUser);
-    setView("main");
+    const formData = new FormData(e.currentTarget);
+    const payload = Object.fromEntries(formData.entries());
+
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        setUser(data.user);
+        setView("main");
+      } else {
+        alert(data.error || "Registration failed");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("An error occurred during registration");
+    }
   };
 
   const handleBook = async (classId: string) => {
@@ -442,7 +463,51 @@ export default function App() {
                   <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest mt-1">Sessions this month</p>
                 </Card>
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mt-8">Recent Activity</h3>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-10">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-slate-900">Featured Classes</h3>
+                    <button onClick={() => setActiveTab("classes")} className="text-sm font-bold text-primary hover:underline">View All</button>
+                  </div>
+                  <div className="space-y-3">
+                    {classes.slice(0, 2).map((c) => (
+                      <Card key={c.id} className="flex items-center justify-between py-4 group cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setActiveTab("classes")}>
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-slate-100 rounded-xl overflow-hidden shrink-0">
+                            {c.image && <img src={c.image} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />}
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-900">{c.name}</p>
+                            <p className="text-xs text-slate-500">{c.time} • {c.trainer}</p>
+                          </div>
+                        </div>
+                        <Plus className="w-5 h-5 text-slate-300 group-hover:text-primary" />
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-slate-900">Recommended Products</h3>
+                    <button onClick={() => setActiveTab("products")} className="text-sm font-bold text-primary hover:underline">Shop Now</button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {inventory.slice(0, 2).map((item) => (
+                      <Card key={item.id} className="p-3 flex flex-col gap-2 group cursor-pointer" onClick={() => setActiveTab("products")}>
+                        <div className="aspect-square bg-slate-100 rounded-lg overflow-hidden relative">
+                           {item.image && <img src={item.image} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform" referrerPolicy="no-referrer" />}
+                           <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur rounded px-1.5 py-0.5 font-bold text-[10px] shadow-sm">${item.price}</div>
+                        </div>
+                        <p className="text-xs font-bold text-slate-900 truncate">{item.name}</p>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <h3 className="text-xl font-bold text-slate-900 mt-10 mb-4">Recent Activity</h3>
               <div className="space-y-3">
                 {[1, 2].map((i) => (
                   <Card key={i} className="flex items-center justify-between py-4">
