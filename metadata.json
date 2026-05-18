@@ -1,0 +1,6 @@
+{
+  "name": "FitNex",
+  "description": "Smart Gym Management System for members, trainers, and admins with class bookings, attendance tracking, and inventory management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
