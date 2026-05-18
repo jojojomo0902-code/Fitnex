@@ -129,23 +129,48 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("home");
   
   // Data State
-  const [classes, setClasses] = useState<GymClass[]>([]);
-  const [inventory, setInventory] = useState<Product[]>([]);
+  const [classes, setClasses] = useState<GymClass[]>([
+    { id: "1", name: "Morning Yoga", trainer: "Siti Nur", time: "08:00 AM", capacity: 20, booked: 5, category: "Yoga", image: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800" },
+    { id: "2", name: "High Intensity Cardio", trainer: "Muthu Raja", time: "10:00 AM", capacity: 15, booked: 12, category: "Cardio", image: "https://images.unsplash.com/photo-1538805060514-97d9cc17730c?auto=format&fit=crop&q=80&w=800" },
+    { id: "3", name: "Power Lifting", trainer: "Dwayne Ali", time: "05:00 PM", capacity: 10, booked: 8, category: "Strength", image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=800" },
+    { id: "4", name: "Pilates Advance", trainer: "Siti Nur", time: "06:30 PM", capacity: 12, booked: 4, category: "Yoga", image: "https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&q=80&w=800" }
+  ]);
+  const [inventory, setInventory] = useState<Product[]>([
+    { id: "1", name: "Whey Protein (Vanilla)", category: "Supplements", stock: 25, price: 50, image: "https://images.unsplash.com/photo-1593095948071-474c5cc2989d?auto=format&fit=crop&q=80&w=800" },
+    { id: "2", name: "Gym Towel", category: "Merchandise", stock: 50, price: 15, image: "https://images.unsplash.com/photo-1583912267550-d44d2a3ad77a?auto=format&fit=crop&q=80&w=800" },
+    { id: "3", name: "Pre-Workout Blaze", category: "Supplements", stock: 5, price: 40, image: "https://images.unsplash.com/photo-1579758629938-03607ccdbaba?auto=format&fit=crop&q=80&w=800" },
+    { id: "4", name: "FitNex Shaker", category: "Merchandise", stock: 100, price: 12, image: "https://images.unsplash.com/photo-1620188467120-5042ed1eb5da?auto=format&fit=crop&q=80&w=800" },
+    { id: "5", name: "Creatine 300g", category: "Supplements", stock: 8, price: 35, image: "https://images.unsplash.com/photo-1550345332-09e3ac987658?auto=format&fit=crop&q=80&w=800" }
+  ]);
   const [adminStats, setAdminStats] = useState<any>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
 
   const fetchData = async () => {
     try {
       const classRes = await fetch("/api/classes");
-      setClasses(await classRes.json());
+      if (classRes.ok) {
+        const data = await classRes.json();
+        if (data && Array.isArray(data) && data.length > 0) {
+          setClasses(data);
+        }
+      }
       
       const invRes = await fetch("/api/inventory");
-      setInventory(await invRes.json());
+      if (invRes.ok) {
+        const data = await invRes.json();
+        if (data && Array.isArray(data) && data.length > 0) {
+          setInventory(data);
+        }
+      }
 
       if (user?.role === "Admin" || user?.role === "Trainer") {
         const statRes = await fetch("/api/admin/stats");
-        setAdminStats(await statRes.json());
-        // For simplicity, we can't fetch all users easily without an API but let's mock it for the front-end
+        if (statRes.ok) {
+          const stats = await statRes.json();
+          setAdminStats(stats);
+        }
+        
+        // Ensure we show some users for dashboard views
         setAllUsers([
           { id: "m-1", name: "Ali Bin Abu", email: "ali@email.com", role: "Member", plan: "Premium", status: "Active", avatar: "https://images.unsplash.com/photo-1548142813-c348350df52b?auto=format&fit=crop&q=80&w=150" },
           { id: "m-2", name: "Ling Mei", email: "ling@email.com", role: "Member", plan: "Basic", status: "Active", avatar: "https://images.unsplash.com/photo-1516523653452-4bab72b99650?auto=format&fit=crop&q=80&w=150" },
@@ -155,14 +180,12 @@ export default function App() {
         ]);
       }
     } catch (e) {
-      console.error(e);
+      console.error("Fetch Error:", e);
     }
   };
 
   useEffect(() => {
-    if (user) {
-      fetchData();
-    }
+    fetchData();
   }, [user]);
 
   const handleLogin = (e: any) => {

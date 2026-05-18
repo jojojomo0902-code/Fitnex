@@ -9,41 +9,75 @@ async function startServer() {
 
   app.use(express.json());
 
-  // Mock Database Path
+  // Initialize DB with proper data check
   const DB_PATH = path.join(process.cwd(), "db.json");
+  const initialData = {
+    users: [
+      { id: "admin-1", name: "Raja Admin", email: "admin@fitnex.com", password: "admin", role: "Admin" },
+      { id: "trainer-1", name: "Siti Nur", email: "trainer@fitnex.com", password: "trainer", role: "Trainer", avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150" },
+      { id: "m-1", name: "Ali Bin Abu", email: "ali@email.com", password: "user", role: "Member", plan: "Premium", status: "Active", avatar: "https://images.unsplash.com/photo-1548142813-c348350df52b?auto=format&fit=crop&q=80&w=150" },
+      { id: "m-2", name: "Ling Mei", email: "ling@email.com", password: "user", role: "Member", plan: "Basic", status: "Active", avatar: "https://images.unsplash.com/photo-1516523653452-4bab72b99650?auto=format&fit=crop&q=80&w=150" },
+      { id: "m-3", name: "Muthu Raja", email: "muthu@email.com", password: "user", role: "Member", plan: "Premium", status: "Active", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150" },
+      { id: "m-4", name: "Amira Zulkifli", email: "amira@email.com", password: "user", role: "Member", plan: "Premium", status: "Active", avatar: "https://images.unsplash.com/photo-1567532939604-b6c5b0ad2e01?auto=format&fit=crop&q=80&w=150" }
+    ],
+    classes: [
+      { id: "1", name: "Morning Yoga", trainer: "Siti Nur", time: "08:00 AM", capacity: 20, booked: 5, category: "Yoga", image: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800" },
+      { id: "2", name: "High Intensity Cardio", trainer: "Muthu Raja", time: "10:00 AM", capacity: 15, booked: 12, category: "Cardio", image: "https://images.unsplash.com/photo-1538805060514-97d9cc17730c?auto=format&fit=crop&q=80&w=800" },
+      { id: "3", name: "Power Lifting", trainer: "Dwayne Ali", time: "05:00 PM", capacity: 10, booked: 8, category: "Strength", image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=800" },
+      { id: "4", name: "Pilates Advance", trainer: "Siti Nur", time: "06:30 PM", capacity: 12, booked: 4, category: "Yoga", image: "https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&q=80&w=800" }
+    ],
+    inventory: [
+      { id: "1", name: "Whey Protein (Vanilla)", category: "Supplements", stock: 25, price: 50, image: "https://images.unsplash.com/photo-1593095948071-474c5cc2989d?auto=format&fit=crop&q=80&w=800" },
+      { id: "2", name: "Gym Towel", category: "Merchandise", stock: 50, price: 15, image: "https://images.unsplash.com/photo-1583912267550-d44d2a3ad77a?auto=format&fit=crop&q=80&w=800" },
+      { id: "3", name: "Pre-Workout Blaze", category: "Supplements", stock: 5, price: 40, image: "https://images.unsplash.com/photo-1579758629938-03607ccdbaba?auto=format&fit=crop&q=80&w=800" },
+      { id: "4", name: "FitNex Shaker", category: "Merchandise", stock: 100, price: 12, image: "https://images.unsplash.com/photo-1620188467120-5042ed1eb5da?auto=format&fit=crop&q=80&w=800" },
+      { id: "5", name: "Creatine 300g", category: "Supplements", stock: 8, price: 35, image: "https://images.unsplash.com/photo-1550345332-09e3ac987658?auto=format&fit=crop&q=80&w=800" }
+    ],
+    bookings: [],
+    attendance: []
+  };
 
-  // Initialize DB if not exists
+  const getDb = () => {
+    try {
+      if (!fs.existsSync(DB_PATH)) {
+        console.log("DB file missing, creating with initial data...");
+        fs.writeFileSync(DB_PATH, JSON.stringify(initialData, null, 2));
+        return initialData;
+      }
+      const fileContent = fs.readFileSync(DB_PATH, "utf-8");
+      if (!fileContent || fileContent.trim() === "") {
+        console.log("DB file empty, re-initializing...");
+        fs.writeFileSync(DB_PATH, JSON.stringify(initialData, null, 2));
+        return initialData;
+      }
+      const data = JSON.parse(fileContent);
+      // Ensure essential fields exist, if not merge with initial
+      if (!data.classes || data.classes.length === 0 || !data.inventory || data.inventory.length === 0) {
+        console.log("DB missing core collections, merging with initial...");
+        const merged = { ...initialData, ...data };
+        // If they are actually empty arrays (not missing), we still might want to merge if it's a fresh deploy
+        if (!data.classes || data.classes.length === 0) merged.classes = initialData.classes;
+        if (!data.inventory || data.inventory.length === 0) merged.inventory = initialData.inventory;
+        return merged;
+      }
+      return data;
+    } catch (e) {
+      console.error("Critical error reading database:", e);
+      return initialData;
+    }
+  };
+
+  const saveDb = (data: any) => {
+    try {
+      fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+    } catch (e) {
+      console.error("Error saving database:", e);
+    }
+  };
+
   if (!fs.existsSync(DB_PATH)) {
-    const initialData = {
-      users: [
-        { id: "admin-1", name: "Raja Admin", email: "admin@fitnex.com", password: "admin", role: "Admin" },
-        { id: "trainer-1", name: "Siti Nur", email: "trainer@fitnex.com", password: "trainer", role: "Trainer", avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150" },
-        { id: "m-1", name: "Ali Bin Abu", email: "ali@email.com", password: "user", role: "Member", plan: "Premium", status: "Active", avatar: "https://images.unsplash.com/photo-1548142813-c348350df52b?auto=format&fit=crop&q=80&w=150" },
-        { id: "m-2", name: "Ling Mei", email: "ling@email.com", password: "user", role: "Member", plan: "Basic", status: "Active", avatar: "https://images.unsplash.com/photo-1516523653452-4bab72b99650?auto=format&fit=crop&q=80&w=150" },
-        { id: "m-3", name: "Muthu Raja", email: "muthu@email.com", password: "user", role: "Member", plan: "Premium", status: "Active", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150" },
-        { id: "m-4", name: "Amira Zulkifli", email: "amira@email.com", password: "user", role: "Member", plan: "Premium", status: "Active", avatar: "https://images.unsplash.com/photo-1567532939604-b6c5b0ad2e01?auto=format&fit=crop&q=80&w=150" }
-      ],
-      classes: [
-        { id: "1", name: "Morning Yoga", trainer: "Siti Nur", time: "08:00 AM", capacity: 20, booked: 5, category: "Yoga", image: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800" },
-        { id: "2", name: "High Intensity Cardio", trainer: "Muthu Raja", time: "10:00 AM", capacity: 15, booked: 12, category: "Cardio", image: "https://images.unsplash.com/photo-1538805060514-97d9cc17730c?auto=format&fit=crop&q=80&w=800" },
-        { id: "3", name: "Power Lifting", trainer: "Dwayne Ali", time: "05:00 PM", capacity: 10, booked: 8, category: "Strength", image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=800" },
-        { id: "4", name: "Pilates Advance", trainer: "Siti Nur", time: "06:30 PM", capacity: 12, booked: 4, category: "Yoga", image: "https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&q=80&w=800" }
-      ],
-      inventory: [
-        { id: "1", name: "Whey Protein (Vanilla)", category: "Supplements", stock: 25, price: 50, image: "https://images.unsplash.com/photo-1593095948071-474c5cc2989d?auto=format&fit=crop&q=80&w=800" },
-        { id: "2", name: "Gym Towel", category: "Merchandise", stock: 50, price: 15, image: "https://images.unsplash.com/photo-1583912267550-d44d2a3ad77a?auto=format&fit=crop&q=80&w=800" },
-        { id: "3", name: "Pre-Workout Blaze", category: "Supplements", stock: 5, price: 40, image: "https://images.unsplash.com/photo-1579758629938-03607ccdbaba?auto=format&fit=crop&q=80&w=800" },
-        { id: "4", name: "FitNex Shaker", category: "Merchandise", stock: 100, price: 12, image: "https://images.unsplash.com/photo-1620188467120-5042ed1eb5da?auto=format&fit=crop&q=80&w=800" },
-        { id: "5", name: "Creatine 300g", category: "Supplements", stock: 8, price: 35, image: "https://images.unsplash.com/photo-1550345332-09e3ac987658?auto=format&fit=crop&q=80&w=800" }
-      ],
-      bookings: [],
-      attendance: []
-    };
-    fs.writeFileSync(DB_PATH, JSON.stringify(initialData, null, 2));
+    saveDb(initialData);
   }
-
-  const getDb = () => JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
-  const saveDb = (data: any) => fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
 
   // --- API Routes ---
 
