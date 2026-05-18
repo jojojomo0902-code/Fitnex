@@ -165,55 +165,42 @@ export default function App() {
     }
   }, [user]);
 
-  const handleLogin = async (e: any) => {
+  const handleLogin = (e: any) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const email = formData.get("email");
-    const password = formData.get("password");
-
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, role: selectedRole })
-      });
-      
-      const data = await res.json();
-      if (res.ok) {
-        setUser(data.user);
-        setView("main");
-      } else {
-        alert(data.error || "Login failed");
-      }
-    } catch (e) {
-      console.error(e);
-      alert("An error occurred during login");
-    }
+    const email = formData.get("email") as string;
+    
+    // Allow any login to work instantly for exploration
+    const mockUser: User = {
+      id: "user-" + Math.random().toString(36).substr(2, 9),
+      name: email.split('@')[0] || selectedRole,
+      email: email || "demo@fitnex.com",
+      role: selectedRole,
+      plan: selectedRole === "Member" ? "Premium" : undefined,
+      status: "Active"
+    };
+    
+    setUser(mockUser);
+    setView("main");
   };
 
-  const handleRegister = async (e: any) => {
+  const handleRegister = (e: any) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const payload = Object.fromEntries(formData.entries());
+    const name = formData.get("name") as string;
+    const email = formData.get("email") as string;
 
-    try {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      
-      const data = await res.json();
-      if (res.ok) {
-        setUser(data.user);
-        setView("main");
-      } else {
-        alert(data.error || "Registration failed");
-      }
-    } catch (e) {
-      console.error(e);
-      alert("An error occurred during registration");
-    }
+    const mockUser: User = {
+      id: "new-" + Math.random().toString(36).substr(2, 9),
+      name: name || "New Member",
+      email: email || "new@fitnex.com",
+      role: "Member",
+      plan: "Basic",
+      status: "Active"
+    };
+
+    setUser(mockUser);
+    setView("main");
   };
 
   const handleBook = async (classId: string) => {
@@ -224,11 +211,35 @@ export default function App() {
         body: JSON.stringify({ userId: user?.id, classId })
       });
       if (res.ok) {
-        alert("Class booked!");
+        alert("Booking successful! Expect to see you there.");
         fetchData();
+      } else {
+        const error = await res.json();
+        alert(error.error || "Booking failed");
       }
     } catch (e) {
       console.error(e);
+      alert("An error occurred during booking");
+    }
+  };
+
+  const handleBuy = async (productId: string) => {
+    try {
+      const res = await fetch("/api/inventory/buy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user?.id, productId })
+      });
+      if (res.ok) {
+        alert("Purchase successful! Item added to your orders.");
+        fetchData();
+      } else {
+        const error = await res.json();
+        alert(error.error || "Purchase failed");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("An error occurred during purchase");
     }
   };
 
@@ -368,7 +379,8 @@ export default function App() {
               </label>
               <button type="button" className="text-primary font-semibold hover:underline">Forgot Password?</button>
             </div>
-            <Button className="w-full py-4 text-lg">Login</Button>
+            <Button type="submit" className="w-full py-4 text-lg">Login</Button>
+            
             {selectedRole === "Member" && (
               <p className="text-center text-slate-500 mt-4">
                 New member? <button type="button" onClick={() => setView("register")} className="text-primary font-semibold hover:underline">Join now</button>
@@ -472,7 +484,7 @@ export default function App() {
                   </div>
                   <div className="space-y-3">
                     {classes.slice(0, 2).map((c) => (
-                      <Card key={c.id} className="flex items-center justify-between py-4 group cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setActiveTab("classes")}>
+                      <Card key={c.id} className="flex items-center justify-between py-4 group cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => handleBook(c.id)}>
                         <div className="flex items-center gap-4">
                           <div className="w-12 h-12 bg-slate-100 rounded-xl overflow-hidden shrink-0">
                             {c.image && <img src={c.image} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />}
@@ -482,7 +494,9 @@ export default function App() {
                             <p className="text-xs text-slate-500">{c.time} • {c.trainer}</p>
                           </div>
                         </div>
-                        <Plus className="w-5 h-5 text-slate-300 group-hover:text-primary" />
+                        <div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
+                           <Plus className="w-4 h-4" />
+                        </div>
                       </Card>
                     ))}
                   </div>
@@ -495,12 +509,15 @@ export default function App() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     {inventory.slice(0, 2).map((item) => (
-                      <Card key={item.id} className="p-3 flex flex-col gap-2 group cursor-pointer" onClick={() => setActiveTab("products")}>
+                      <Card key={item.id} className="p-3 flex flex-col gap-2 group cursor-pointer" onClick={() => handleBuy(item.id)}>
                         <div className="aspect-square bg-slate-100 rounded-lg overflow-hidden relative">
                            {item.image && <img src={item.image} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform" referrerPolicy="no-referrer" />}
                            <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur rounded px-1.5 py-0.5 font-bold text-[10px] shadow-sm">${item.price}</div>
                         </div>
-                        <p className="text-xs font-bold text-slate-900 truncate">{item.name}</p>
+                        <div className="flex items-center justify-between gap-1">
+                          <p className="text-xs font-bold text-slate-900 truncate">{item.name}</p>
+                          <Plus className="w-3 h-3 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
                       </Card>
                     ))}
                   </div>
@@ -632,6 +649,7 @@ export default function App() {
                        <span className="font-black text-xl text-slate-900 tracking-tighter">${item.price}</span>
                        <Button 
                          variant="primary" 
+                         onClick={() => handleBuy(item.id)}
                          className="h-10 w-10 p-0 rounded-full shadow-lg hover:rotate-90 transition-all duration-300" 
                          disabled={item.stock === 0}
                        >

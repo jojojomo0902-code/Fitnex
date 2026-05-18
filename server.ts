@@ -97,6 +97,21 @@ async function startServer() {
     res.json(db.inventory);
   });
 
+  app.post("/api/inventory/buy", (req, res) => {
+    const { userId, productId } = req.body;
+    const db = getDb();
+    const product = db.inventory.find((p: any) => p.id === productId);
+    
+    if (product && product.stock > 0) {
+      product.stock -= 1;
+      // In a real app we'd save the order, but for now just decrement stock
+      saveDb(db);
+      res.json({ success: true, newStock: product.stock });
+    } else {
+      res.status(400).json({ error: "Product out of stock or not found" });
+    }
+  });
+
   // Stats (Admin)
   app.get("/api/admin/stats", (req, res) => {
     const db = getDb();
